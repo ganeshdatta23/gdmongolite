@@ -1,5 +1,5 @@
 # gdmongolite Documentation
-gdmongolite is a zero-boilerplate, schema-first, multi-driver MongoDB toolkit that unifies sync and async drivers, Pydantic validation, migrations, telemetry hooks, and a CLI into one package.
+**gdmongolite** is a zero-boilerplate, schema-first, multi-driver MongoDB toolkit that unifies synchronous and asynchronous drivers, Pydantic-powered validation, automatic migrations, telemetry hooks, and a full CLI—all in one package. You write only your data models and queries; gdmongolite handles the rest.
 
 ## Table of Contents
 1. Installation
@@ -7,7 +7,7 @@ gdmongolite is a zero-boilerplate, schema-first, multi-driver MongoDB toolkit th
 3. Defining Schemas
 4. Connecting to MongoDB
 5. CRUD Operations
-6. Migrations
+6. Automatic Migrations
 7. Interactive Shell
 8. Model Generation
 9. Telemetry Hooks
@@ -18,129 +18,178 @@ gdmongolite is a zero-boilerplate, schema-first, multi-driver MongoDB toolkit th
 14. FAQ
 
 ## 1. Installation
-Install from PyPI:
+Install the latest release from PyPI:
 ```bash
 pip install gdmongolite
 ```
-For development tools:
+For development tools (linters, test frameworks):
 ```bash
 pip install gdmongolite[dev]
 ```
 
 ## 2. Configuration
-Create a `.env` file in your project root:
-```
+gdmongolite loads MongoDB connection settings from a `.env` file or environment variables. Create `.env` in your project root:
+```dotenv
 MONGO_URI="mongodb://localhost:27017"
 MONGO_DB="myapp"
 MONGO_MAX_POOL=50
+MONGO_MIN_POOL=5
+MONGO_TIMEOUT_MS=30000
 ```
-gdmongolite reads these automatically via environment variables. You can also override via environment variables.
+Alternatively, set environment variables directly:
+```bash
+export MONGO_URI="mongodb://db.example.com:27017"
+```
+gdmongolite uses these settings automatically—no additional code required.
 
 ## 3. Defining Schemas
-All schemas inherit from `Schema`. Collection names are inferred:
+All your data models inherit from `Schema`. Collections are named automatically (snake_case of the class name).
 ```python
 # src/gdmongolite/schema/__init__.py
 from gdmongolite import DB, Schema, Email, Positive
 
-db = DB()  # Uses .env
+# Create or reuse the default DB instance
+db = DB()
 
 class User(Schema):
-    name: str
-    email: Email          # Validates format
-    age: Positive       # Must be >0
-    tags: list[str] = []  # Default empty list
+    """User document with validation"""
+    name: str               # any non-empty string
+    email: Email            # must match email format
+    age: Positive()         # must be > 0
+    tags: list[str] = []    # default to empty list
+
+# After definition, db.User refers to this class
+assert db.User is User
 ```
-Now you can use `db.User` for operations.
+Behind the scenes, gdmongolite:
+- Inherits Pydantic’s validation
+- Binds `User` to the `user` collection
+- Adds built-in CRUD methods
 
 ## 4. Connecting to MongoDB
-Instantiate the singleton `DB` facade:
+Import and instantiate the singleton façade:
 ```python
 from gdmongolite import DB
 
+# Uses .env or env vars; auto-detects sync/async context
 db = DB()
+
+# Or explicitly sync or async:
+db_sync = DB(mode="sync")
+db_async = DB(mode="async")
+
+# Manually specify URI:
+db_custom = DB("mongodb://localhost:27017", database="testdb")
+```
+Close connections when done:
+```python
+await db.close()         # async
+db_sync.close_sync()     # sync
 ```
 
 ## 5. CRUD Operations
-| Operation      | Async                                        |
-|----------------|----------------------------------------------|
-| Insert one     | `await db.User.insert(data)`                 |
-| Find many      | `await db.User.find(**filters).to_list()`    |
-Returned value is a MongoDB cursor for `find` operations.
+gdmongolite exposes simple, consistent methods on each `Schema` subclass.
+| Operation        | Async Example                                                 | Sync Example                                              |
+|------------------|---------------------------------------------------------------|-----------------------------------------------------------|
+| Insert one       | `await db.User.insert({"name":"Alice","email":"a@b.com","age":30})` | `db.User.insert_sync({...})`                              |
+| Find many        | `await db.User.find(age__gte=18).to_list()`                   | `db.User.find(age__gte=18).to_list_sync()`                |
+| Update one       | `await db.User.update({"_id": id}, {"age":31})`               | `db.User.update_sync({...}, {...})`                       |
+| Delete many      | `await db.User.delete(age__lt=13)`                            | `db.User.delete_sync(age__lt=13)`                         |
+Every operation returns a `QueryResponse`:
+```python
+{
+  "success": True,
+  "data": [...],       # inserted IDs or found documents
+  "count": 3,
+  "message": "Found 3 documents"
+}
+```
 
-## 6. Migrations
-Generate migration scripts when schemas change:
+## 6. Automatic Migrations
+When your schemas change (add/remove fields or indexes), generate migration scripts:
 ```bash
 gdmongolite migrate
 ```
-- Creates timestamped scripts under `migrations/`
+- Compares current schema definitions to the live database
+- Creates timestamped Python scripts in `migrations/`
+- Apply migrations automatically at startup or manually:
+```python
+await db.migrate_all()
+```
 
 ## 7. Interactive Shell
-Launch REPL with `db` preloaded:
+Launch a REPL pre-loaded with `db` and your schemas:
 ```bash
 gdmongolite shell
 ```
-Inside the shell:
+Inside:
 ```python
-await db.User.insert({"name":"Bob", "email":"bob@x.com", "age":25})
-users = await db.User.find().to_list()
+>>> await db.User.insert({"name":"Bob","email":"bob@x.com","age":25})
+>>> users = await db.User.find().to_list()
+>>> print(users)
 ```
 
 ## 8. Model Generation
-Scaffold schemas from existing collections:
+Scaffold a Python schema from an existing collection:
 ```bash
-gdmongolite gen-model --collection products --out src/models/product.py
+gdmongolite gen-model \
+  --collection products \
+  --out src/models/product.py
 ```
-- Samples documents
-- Infers field names and types
+- Samples document fields and types
+- Generates a `Product(Schema)` class with inferred attributes
 
 ## 9. Telemetry Hooks
-Register hooks on query events:
+Monitor or instrument queries by registering hooks:
 ```python
-from gdmongolite.core import DBSingleton
+from gdmongolite import DB
 
-@DBSingleton.on("pre_query")
-def before(collection, filt, opts):
-    print(f"About to query {collection}: {filt}")
+@DB.on("pre_query")
+def before_query(collection, filt, opts):
+    print(f"Querying {collection}: {filt}")
 
-@DBSingleton.on("post_query")
-def after(collection, result):
-    print(f"{collection} query completed.")
+@DB.on("post_query")
+def after_query(collection, result):
+    print(f"{collection} returned {result.count} docs in {result.duration}ms")
 ```
+Supported events: `pre_query`, `post_query`, `pre_insert`, `post_insert`, etc. Integrate with any metrics or logging system.
 
 ## 10. CLI Reference
 ```bash
 gdmongolite --help
-# Commands:
-# migrate     Generate and apply migration scripts
-# shell       Launch interactive REPL
-# gen-model   Scaffold a schema from an existing collection
-# test        Run test suite
 ```
+| Command           | Description                                      |
+|-------------------|--------------------------------------------------|
+| migrate           | Generate and apply migration scripts             |
+| shell             | Launch interactive REPL                          |
+| gen-model         | Scaffold a schema from an existing collection    |
+| test              | Run the test suite                               |
+Use `gdmongolite  --help` for command-specific options.
 
 ## 11. Testing
+Install development dependencies:
 ```bash
 pip install gdmongolite[dev]
 pytest --maxfail=1 --disable-warnings -q
 ```
+- Uses `pytest-asyncio` for async tests
+- Aim for ≥ 95% code coverage
 
 ## 12. Project Layout
 ```
 gdmongolite/
 ├── src/gdmongolite/
 │   ├── __init__.py
-│   ├── core.py
-│   ├── schema/
-│   │   └── __init__.py
-│   ├── query.py
-│   ├── migrate/
-│   │   └── __init__.py
-│   ├── telemetry.py
-│   ├── cli.py
-│   ├── config.py
-│   ├── utils.py
-│   └── models/ # Generated models
-├── migrations/      # Auto-generated scripts
-├── tests/
+│   ├── core.py            # DB façade and connection logic
+│   ├── schema.py          # Schema metaclass and built-in types
+│   ├── query.py           # Filter parser and Cursor class
+│   ├── migrate.py         # Migration engine
+│   ├── telemetry.py       # Hook registry
+│   ├── cli.py             # Click-based CLI commands
+│   ├── config.py          # Pydantic BaseSettings
+│   └── utils.py           # Internal helpers
+├── migrations/            # Auto-generated migration scripts
+├── tests/                 # Unit and integration tests
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml
@@ -148,17 +197,30 @@ gdmongolite/
 ```
 
 ## 13. Best Practices
-- Keep schemas small and focused
-- Version your migrations and commit them
-- Use telemetry hooks to capture performance metrics
+- **Keep schemas focused**: One schema per document type
+- **Commit migrations**: Ensure your database schema changes are versioned
+- **Use telemetry**: Capture performance and error metrics early
+- **Test across modes**: Run tests in both sync and async contexts
+- **Leverage CLI**: Automate repetitive tasks (shell, migrations, model generation)
 
 ## 14. FAQ
-**Q: How do I handle large result sets?**
-A: Use cursors with `to_list()`.
-**Q: Can I use gdmongolite with FastAPI?**
-A: Absolutely—instantiate `db` at startup and import your schemas into your routers.
-
-**gdmongolite** empowers you with a single, coherent API for all MongoDB needs—schema definition, validation, querying, migrations, telemetry, and CLI tooling—ensuring you never touch low-level driver code again.
+**Q: How to handle large datasets?**
+A: Use cursor batching:
+```python
+cursor = db.User.find().batch_size(100)
+for batch in await cursor.to_list():
+    process(batch)
+```
+**Q: Can I integrate with FastAPI?**
+A: Yes. Initialize `db` in your startup event and import schemas into routers.
+**Q: Are transactions supported?**
+A: Use:
+```python
+async with db.transaction():
+    await db.Order.insert({...})
+    await db.Inventory.update({...})
+```
+gdmongolite empowers everyone—from beginners to experts—to build MongoDB-backed applications with minimal boilerplate, robust validation, and comprehensive tooling. Start coding and let gdmongolite handle the rest
 
 ## Author
 **Ganesh Datta Padamata**

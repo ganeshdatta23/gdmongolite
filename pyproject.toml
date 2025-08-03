@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "gdmongolite"
-version = "0.1.1"
-description = "gdmongolite is a zero-boilerplate, schema-first, multi-driver MongoDB toolkit that unifies sync and async drivers, Pydantic validation, migrations, telemetry hooks, and a CLI into one package."
+version = "0.1.2"
+description = "gdmongolite is a zero-boilerplate, schema-first, multi-driver MongoDB toolkit that unifies synchronous and asynchronous drivers, Pydantic-powered validation, automatic migrations, telemetry hooks, and a full CLI—all in one package. You write only your data models and queries; gdmongolite handles the rest."
 authors = ["Ganesh Datta Padamata <ganeshdattapadamata@gmail.com>"]
 license = "MIT"
 readme = "README.md"
