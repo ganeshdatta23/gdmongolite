@@ -2,7 +2,7 @@
 name = "gdmongolite"
 version = "0.1.0"
 description = "gdmongolite: lightweight, auto-maintained all-in-one MongoDB toolkit by Ganeshdatta"
-authors = ["Ganeshdatta"]
+authors = ["Ganesh Datta Padamata <ganeshdattapadamata@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [{include = "gdmongolite", from = "src"}]
