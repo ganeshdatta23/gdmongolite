@@ -136,6 +136,8 @@ gdmongolite/
 │   │   └── __init__.py
 │   ├── telemetry.py
 │   ├── cli.py
+│   ├── config.py
+│   ├── utils.py
 │   └── models/ # Generated models
 ├── migrations/      # Auto-generated scripts
 ├── tests/
