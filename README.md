@@ -1,228 +1,611 @@
-# gdmongolite Documentation
-**gdmongolite** is a zero-boilerplate, schema-first, multi-driver MongoDB toolkit that unifies synchronous and asynchronous drivers, Pydantic-powered validation, automatic migrations, telemetry hooks, and a full CLI—all in one package. You write only your data models and queries; gdmongolite handles the rest.
+# gdmongolite - The World's Most Powerful and Easiest MongoDB Toolkit
 
-## Table of Contents
-1. Installation
-2. Configuration
-3. Defining Schemas
-4. Connecting to MongoDB
-5. CRUD Operations
-6. Automatic Migrations
-7. Interactive Shell
-8. Model Generation
-9. Telemetry Hooks
-10. CLI Reference
-11. Testing
-12. Project Layout
-13. Best Practices
-14. FAQ
+**Zero-boilerplate, schema-first MongoDB operations with automatic sync/async detection, advanced queries, real-time features, comprehensive security, intelligent caching, full monitoring, FastAPI integration, and production-ready deployment tools.**
 
-## 1. Installation
-Install the latest release from PyPI:
+[![PyPI version](https://badge.fury.io/py/gdmongolite.svg)](https://badge.fury.io/py/gdmongolite)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Installation
+
 ```bash
 pip install gdmongolite
 ```
-For development tools (linters, test frameworks):
-```bash
-pip install gdmongolite[dev]
+
+## Quick Start (30 seconds to productivity!)
+
+```python
+from gdmongolite import DB, Schema, Email, FieldTypes
+
+# 1. Define your data model
+class User(Schema):
+    name: FieldTypes.Name
+    email: Email
+    age: FieldTypes.Age
+    role: str = "user"
+
+# 2. Connect and register
+db = DB()  # Auto-connects to MongoDB
+db.register_schema(User)
+
+# 3. Use it! (Works in both sync and async)
+async def main():
+    # Insert with automatic validation
+    user = await db.User.insert({
+        "name": "John Doe",
+        "email": "john@example.com",
+        "age": 30
+    })
+    
+    # Query with advanced filtering
+    users = await db.User.find(age__gte=18, role="user").to_list()
+    
+    # Update documents
+    await db.User.update({"role": "user"}, {"$set": {"role": "member"}})
+    
+    # Aggregations made simple
+    stats = await db.User.aggregate().group("$role", count={"$sum": 1}).execute()
 ```
 
-## 2. Configuration
-gdmongolite loads MongoDB connection settings from a `.env` file or environment variables. Create `.env` in your project root:
-```dotenv
-MONGO_URI="mongodb://localhost:27017"
-MONGO_DB="myapp"
+## Complete Feature Guide
+
+### 1. Schema Definition and Validation
+
+```python
+from gdmongolite import DB, Schema, Email, FieldTypes
+from typing import List, Optional
+from datetime import datetime
+
+class User(Schema):
+    # Built-in field types with validation
+    name: FieldTypes.Name              # 1-100 chars
+    email: Email                       # Email validation
+    age: FieldTypes.Age               # 0-150 range
+    username: FieldTypes.Username     # 3-30 chars, alphanumeric
+    
+    # Optional fields with defaults
+    role: str = "user"
+    is_active: bool = True
+    tags: List[str] = []
+    created_at: datetime = datetime.now()
+    
+    # Custom validation
+    bio: Optional[FieldTypes.Description] = None  # Max 1000 chars
+
+class Product(Schema):
+    name: FieldTypes.Title
+    price: FieldTypes.Price           # Non-negative float
+    rating: FieldTypes.Rating         # 0-5 range
+    category: str
+    in_stock: bool = True
+
+class Order(Schema):
+    user_id: str
+    product_ids: List[str]
+    total: FieldTypes.Price
+    status: str = "pending"
+    order_date: datetime = datetime.now()
+```
+
+### 2. Database Connection and Setup
+
+```python
+# Basic connection (uses environment variables or defaults)
+db = DB()
+
+# Custom connection
+db = DB(
+    uri="mongodb://localhost:27017",
+    database="myapp"
+)
+
+# Production connection with all options
+db = DB(
+    uri="mongodb+srv://user:pass@cluster.mongodb.net/",
+    database="production"
+)
+
+# Register your schemas
+db.register_schema(User)
+db.register_schema(Product)
+db.register_schema(Order)
+```
+
+### 3. CRUD Operations (Create, Read, Update, Delete)
+
+#### Create (Insert)
+```python
+# Single document
+user = await db.User.insert({
+    "name": "Alice Johnson",
+    "email": "alice@example.com",
+    "age": 28,
+    "role": "admin"
+})
+
+# Multiple documents
+users = await db.User.insert([
+    {"name": "Bob", "email": "bob@example.com", "age": 25},
+    {"name": "Carol", "email": "carol@example.com", "age": 30}
+])
+
+# Using schema objects
+user_obj = User(name="David", email="david@example.com", age=35)
+result = await db.User.insert(user_obj)
+```
+
+#### Read (Find/Query)
+```python
+# Find all
+all_users = await db.User.find().to_list()
+
+# Find with filters
+adults = await db.User.find(age__gte=18).to_list()
+admins = await db.User.find(role="admin").to_list()
+
+# Complex queries
+active_adults = await db.User.find(
+    age__gte=18,
+    is_active=True,
+    role__in=["user", "admin"]
+).to_list()
+
+# Find one
+user = await db.User.find(email="alice@example.com").first()
+
+# Pagination
+page1 = await db.User.find().skip(0).limit(10).to_list()
+page2 = await db.User.find().skip(10).limit(10).to_list()
+
+# Sorting
+newest = await db.User.find().sort("-created_at").to_list()
+oldest = await db.User.find().sort("created_at").to_list()
+
+# Count
+total_users = await db.User.find().count()
+adult_count = await db.User.find(age__gte=18).count()
+```
+
+#### Update
+```python
+# Update many documents
+result = await db.User.update(
+    {"role": "user"},                    # Filter
+    {"$set": {"role": "member"}}         # Update
+)
+
+# Update with operators
+await db.User.update(
+    {"_id": user_id},
+    {
+        "$set": {"last_login": datetime.now()},
+        "$inc": {"login_count": 1},
+        "$push": {"tags": "active"}
+    }
+)
+
+# Upsert (insert if not exists)
+await db.User.update(
+    {"email": "new@example.com"},
+    {"$set": {"name": "New User", "age": 25}},
+    upsert=True
+)
+```
+
+#### Delete
+```python
+# Delete documents
+result = await db.User.delete(role="inactive")
+result = await db.User.delete(age__lt=13)  # Remove underage users
+
+# Delete by ID
+await db.User.delete(_id=user_id)
+```
+
+### 4. Advanced Queries and Aggregations
+
+```python
+# Complex aggregation pipeline
+pipeline_result = await (
+    db.Order.aggregate()
+    .match(status="completed")
+    .lookup("users", "user_id", "_id", "user_info")
+    .unwind("user_info")
+    .group(
+        "$user_info.role",
+        total_orders={"$sum": 1},
+        total_revenue={"$sum": "$total"},
+        avg_order={"$avg": "$total"}
+    )
+    .sort(total_revenue=-1)
+    .execute()
+)
+
+# Statistical analysis
+user_stats = await (
+    db.User.aggregate()
+    .group(
+        None,
+        total_users={"$sum": 1},
+        avg_age={"$avg": "$age"},
+        min_age={"$min": "$age"},
+        max_age={"$max": "$age"}
+    )
+    .execute()
+)
+
+# Date-based grouping
+monthly_signups = await (
+    db.User.aggregate()
+    .group(
+        {"$dateToString": {"format": "%Y-%m", "date": "$created_at"}},
+        count={"$sum": 1}
+    )
+    .sort(_id=1)
+    .execute()
+)
+```
+
+### 5. Data Import/Export
+
+```python
+from gdmongolite import DataImporter, DataExporter
+
+# Export data
+exporter = DataExporter(db)
+
+# Export to JSON
+await exporter.export_to_json(db.User, "users.json")
+await exporter.export_to_json(
+    db.User.find(role="admin"), 
+    "admin_users.json"
+)
+
+# Export to CSV
+await exporter.export_to_csv(db.User, "users.csv")
+
+# Import data
+importer = DataImporter(db)
+
+# Import from JSON
+await importer.import_from_json("users.json", User)
+
+# Import from CSV with mapping
+await importer.import_from_csv(
+    "users.csv", 
+    User,
+    field_mapping={
+        "full_name": "name",
+        "email_address": "email",
+        "user_age": "age"
+    }
+)
+
+# Batch import with validation
+await importer.batch_import(
+    data_source="large_dataset.json",
+    schema=User,
+    batch_size=1000,
+    validate=True
+)
+```
+
+### 6. FastAPI Integration (Auto-Generated REST APIs)
+
+```python
+from gdmongolite import create_fastapi_app
+from fastapi import FastAPI
+
+# Create full REST API automatically
+app = create_fastapi_app(
+    db,
+    schemas=[User, Product, Order],
+    title="My Powerful API",
+    version="1.0.0",
+    enable_docs=True
+)
+
+# Automatically generates these endpoints:
+# GET    /users/              - List users (with pagination, filtering, sorting)
+# POST   /users/              - Create user
+# GET    /users/{id}          - Get user by ID
+# PUT    /users/{id}          - Update user
+# DELETE /users/{id}          - Delete user
+# POST   /users/search        - Advanced search
+# GET    /users/count         - Count users
+# Same for Product and Order...
+
+# Add custom endpoints
+@app.get("/analytics/dashboard")
+async def analytics():
+    return {
+        "total_users": await db.User.find().count(),
+        "total_orders": await db.Order.find().count(),
+        "revenue": await db.Order.aggregate().group(
+            None, total={"$sum": "$total"}
+        ).execute()
+    }
+
+# Run the server
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+### 7. Real-time Features and WebSockets
+
+```python
+from gdmongolite import WebSocketManager
+from fastapi import WebSocket
+
+# Real-time data updates
+@app.websocket("/ws/users")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    
+    # Watch for changes in User collection
+    async def on_user_change(change):
+        await websocket.send_json({
+            "type": "user_update",
+            "operation": change["operationType"],
+            "data": change.get("fullDocument", {})
+        })
+    
+    # Subscribe to changes
+    await db.User.watch_changes(on_user_change)
+
+# Live queries that update automatically
+live_query = db.User.live_query(is_active=True)
+await live_query.subscribe(websocket)
+```
+
+### 8. Security and Authentication
+
+```python
+from gdmongolite import SecurityMiddleware, PasswordManager
+
+# Setup security
+security = SecurityMiddleware(db)
+
+# Password hashing
+password_manager = PasswordManager()
+hashed = password_manager.hash_password("user_password")
+is_valid = password_manager.verify_password("user_password", hashed)
+
+# JWT tokens
+from gdmongolite import JWTManager
+jwt_manager = JWTManager(secret_key="your-secret-key")
+
+@app.post("/login")
+async def login(email: str, password: str):
+    user = await db.User.find(email=email).first()
+    if user and password_manager.verify_password(password, user["password"]):
+        token = jwt_manager.create_token({"user_id": str(user["_id"])})
+        return {"access_token": token}
+    raise HTTPException(401, "Invalid credentials")
+
+# Protected endpoints
+@app.get("/protected")
+async def protected_route(current_user=Depends(jwt_manager.get_current_user)):
+    return {"message": f"Hello {current_user['email']}"}
+```
+
+### 9. Caching for Performance
+
+```python
+from gdmongolite import add_caching_to_db
+
+# Enable caching
+cached_db = add_caching_to_db(db)
+
+# Cached queries (automatic)
+users = await cached_db.User.find(role="admin").to_list()  # Cached
+users = await cached_db.User.find(role="admin").to_list()  # From cache
+
+# Manual caching
+@cached_db.cached(ttl=300)  # Cache for 5 minutes
+async def expensive_operation():
+    return await db.Order.aggregate().complex_pipeline().execute()
+
+# Cache statistics
+cache_stats = cached_db.get_cache_stats()
+print(f"Hit rate: {cache_stats['hit_rate']}")
+```
+
+### 10. Monitoring and Performance
+
+```python
+from gdmongolite import add_monitoring_to_db
+
+# Enable monitoring
+monitored_db = add_monitoring_to_db(db)
+
+# Get performance metrics
+stats = monitored_db.get_performance_stats()
+print(f"Average query time: {stats['avg_query_time']}ms")
+print(f"Slow queries: {len(stats['slow_queries'])}")
+
+# Health check
+health = monitored_db.health_check()
+print(f"Database status: {health['status']}")
+print(f"Connection pool: {health['connection_pool']}")
+
+# Built-in monitoring dashboard
+@app.get("/monitoring/dashboard")
+async def monitoring_dashboard():
+    return monitored_db.get_full_stats()
+```
+
+### 11. Sync Usage (Non-async)
+
+```python
+# All operations work in sync mode too
+db = DB()
+db.register_schema(User)
+
+# Sync operations (automatically detected)
+user = db.User.insert_sync({
+    "name": "Sync User",
+    "email": "sync@example.com",
+    "age": 25
+})
+
+users = db.User.find(age__gte=18).to_list_sync()
+db.User.update_sync({"role": "user"}, {"$set": {"updated": True}})
+```
+
+### 12. Environment Configuration
+
+```python
+# .env file
+MONGO_URI=mongodb://localhost:27017
+MONGO_DB=myapp
 MONGO_MAX_POOL=50
 MONGO_MIN_POOL=5
 MONGO_TIMEOUT_MS=30000
-```
-Alternatively, set environment variables directly:
-```bash
-export MONGO_URI="mongodb://db.example.com:27017"
-```
-gdmongolite uses these settings automatically—no additional code required.
 
-## 3. Defining Schemas
-All your data models inherit from `Schema`. Collections are named automatically (snake_case of the class name).
+# Advanced configuration
+GDMONGO_CACHE_TTL=3600
+GDMONGO_ENABLE_MONITORING=true
+GDMONGO_LOG_SLOW_QUERIES=true
+GDMONGO_SLOW_QUERY_THRESHOLD=500
+```
+
+### 13. Production Deployment
+
 ```python
-# src/gdmongolite/schema/__init__.py
-from gdmongolite import DB, Schema, Email, Positive
+# Production-ready setup
+from gdmongolite import production_setup
 
-# Create or reuse the default DB instance
-db = DB()
+db = production_setup(
+    uri="mongodb+srv://user:pass@cluster.mongodb.net/",
+    database="production"
+)
 
+# With all features enabled
+app = create_fastapi_app(
+    db,
+    schemas=[User, Product, Order],
+    enable_monitoring=True,
+    enable_caching=True,
+    enable_security=True,
+    cors_origins=["https://myapp.com"]
+)
+
+# Docker deployment
+# FROM python:3.11-slim
+# COPY . /app
+# WORKDIR /app
+# RUN pip install gdmongolite
+# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+## Why Choose gdmongolite?
+
+### vs PyMongo
+- ❌ PyMongo: Manual everything, no validation, verbose syntax
+- ✅ gdmongolite: Automatic validation, simple syntax, zero boilerplate
+
+### vs MongoEngine  
+- ❌ MongoEngine: Django-style (heavy), sync-only, limited features
+- ✅ gdmongolite: Lightweight, sync+async, comprehensive features
+
+### vs Motor
+- ❌ Motor: Async-only, no validation, manual serialization
+- ✅ gdmongolite: Universal, automatic validation, smart serialization
+
+### vs Beanie
+- ❌ Beanie: Async-only, complex setup, limited tooling
+- ✅ gdmongolite: Universal, zero setup, rich tooling
+
+## Complete Example: E-commerce API
+
+```python
+from gdmongolite import DB, Schema, Email, FieldTypes, create_fastapi_app
+from datetime import datetime
+from typing import List
+
+# Define schemas
 class User(Schema):
-    """User document with validation"""
-    name: str               # any non-empty string
-    email: Email            # must match email format
-    age: Positive()         # must be > 0
-    tags: list[str] = []    # default to empty list
+    name: FieldTypes.Name
+    email: Email
+    password_hash: str
+    role: str = "customer"
 
-# After definition, db.User refers to this class
-assert db.User is User
-```
-Behind the scenes, gdmongolite:
-- Inherits Pydantic’s validation
-- Binds `User` to the `user` collection
-- Adds built-in CRUD methods
+class Product(Schema):
+    name: FieldTypes.Title
+    price: FieldTypes.Price
+    category: str
+    stock: int = 0
 
-## 4. Connecting to MongoDB
-Import and instantiate the singleton façade:
-```python
-from gdmongolite import DB
+class Order(Schema):
+    user_id: str
+    items: List[dict]
+    total: FieldTypes.Price
+    status: str = "pending"
+    created_at: datetime = datetime.now()
 
-# Uses .env or env vars; auto-detects sync/async context
+# Setup database
 db = DB()
+for schema in [User, Product, Order]:
+    db.register_schema(schema)
 
-# Or explicitly sync or async:
-db_sync = DB(mode="sync")
-db_async = DB(mode="async")
+# Create API
+app = create_fastapi_app(db, [User, Product, Order])
 
-# Manually specify URI:
-db_custom = DB("mongodb://localhost:27017", database="testdb")
-```
-Close connections when done:
-```python
-await db.close()         # async
-db_sync.close_sync()     # sync
-```
+# Custom business logic
+@app.post("/orders/")
+async def create_order(order_data: dict):
+    # Validate stock
+    for item in order_data["items"]:
+        product = await db.Product.find(_id=item["product_id"]).first()
+        if product["stock"] < item["quantity"]:
+            raise HTTPException(400, "Insufficient stock")
+    
+    # Create order
+    order = await db.Order.insert(order_data)
+    
+    # Update stock
+    for item in order_data["items"]:
+        await db.Product.update(
+            {"_id": item["product_id"]},
+            {"$inc": {"stock": -item["quantity"]}}
+        )
+    
+    return order
 
-## 5. CRUD Operations
-gdmongolite exposes simple, consistent methods on each `Schema` subclass.
-| Operation        | Async Example                                                 | Sync Example                                              |
-|------------------|---------------------------------------------------------------|-----------------------------------------------------------|
-| Insert one       | `await db.User.insert({"name":"Alice","email":"a@b.com","age":30})` | `db.User.insert_sync({...})`                              |
-| Find many        | `await db.User.find(age__gte=18).to_list()`                   | `db.User.find(age__gte=18).to_list_sync()`                |
-| Update one       | `await db.User.update({"_id": id}, {"age":31})`               | `db.User.update_sync({...}, {...})`                       |
-| Delete many      | `await db.User.delete(age__lt=13)`                            | `db.User.delete_sync(age__lt=13)`                         |
-Every operation returns a `QueryResponse`:
-```python
-{
-  "success": True,
-  "data": [...],       # inserted IDs or found documents
-  "count": 3,
-  "message": "Found 3 documents"
-}
-```
+@app.get("/analytics")
+async def analytics():
+    return {
+        "total_users": await db.User.find().count(),
+        "total_orders": await db.Order.find().count(),
+        "revenue": await db.Order.aggregate().group(
+            None, total={"$sum": "$total"}
+        ).execute(),
+        "top_products": await db.Product.find().sort("-rating").limit(5).to_list()
+    }
 
-## 6. Automatic Migrations
-When your schemas change (add/remove fields or indexes), generate migration scripts:
-```bash
-gdmongolite migrate
-```
-- Compares current schema definitions to the live database
-- Creates timestamped Python scripts in `migrations/`
-- Apply migrations automatically at startup or manually:
-```python
-await db.migrate_all()
+# Run: uvicorn main:app --reload
 ```
 
-## 7. Interactive Shell
-Launch a REPL pre-loaded with `db` and your schemas:
-```bash
-gdmongolite shell
-```
-Inside:
-```python
->>> await db.User.insert({"name":"Bob","email":"bob@x.com","age":25})
->>> users = await db.User.find().to_list()
->>> print(users)
-```
+## Support and Documentation
 
-## 8. Model Generation
-Scaffold a Python schema from an existing collection:
-```bash
-gdmongolite gen-model \
-  --collection products \
-  --out src/models/product.py
-```
-- Samples document fields and types
-- Generates a `Product(Schema)` class with inferred attributes
+- **GitHub**: https://github.com/ganeshdatta999/gdmongolite
+- **Documentation**: https://gdmongolite.readthedocs.io
+- **PyPI**: https://pypi.org/project/gdmongolite/
+- **Issues**: https://github.com/ganeshdatta999/gdmongolite/issues
 
-## 9. Telemetry Hooks
-Monitor or instrument queries by registering hooks:
-```python
-from gdmongolite import DB
+## License
 
-@DB.on("pre_query")
-def before_query(collection, filt, opts):
-    print(f"Querying {collection}: {filt}")
-
-@DB.on("post_query")
-def after_query(collection, result):
-    print(f"{collection} returned {result.count} docs in {result.duration}ms")
-```
-Supported events: `pre_query`, `post_query`, `pre_insert`, `post_insert`, etc. Integrate with any metrics or logging system.
-
-## 10. CLI Reference
-```bash
-gdmongolite --help
-```
-| Command           | Description                                      |
-|-------------------|--------------------------------------------------|
-| migrate           | Generate and apply migration scripts             |
-| shell             | Launch interactive REPL                          |
-| gen-model         | Scaffold a schema from an existing collection    |
-| test              | Run the test suite                               |
-Use `gdmongolite  --help` for command-specific options.
-
-## 11. Testing
-Install development dependencies:
-```bash
-pip install gdmongolite[dev]
-pytest --maxfail=1 --disable-warnings -q
-```
-- Uses `pytest-asyncio` for async tests
-- Aim for ≥ 95% code coverage
-
-## 12. Project Layout
-```
-gdmongolite/
-├── src/gdmongolite/
-│   ├── __init__.py
-│   ├── core.py            # DB façade and connection logic
-│   ├── schema.py          # Schema metaclass and built-in types
-│   ├── query.py           # Filter parser and Cursor class
-│   ├── migrate.py         # Migration engine
-│   ├── telemetry.py       # Hook registry
-│   ├── cli.py             # Click-based CLI commands
-│   ├── config.py          # Pydantic BaseSettings
-│   └── utils.py           # Internal helpers
-├── migrations/            # Auto-generated migration scripts
-├── tests/                 # Unit and integration tests
-├── README.md
-├── LICENSE
-├── pyproject.toml
-└── .env
-```
-
-## 13. Best Practices
-- **Keep schemas focused**: One schema per document type
-- **Commit migrations**: Ensure your database schema changes are versioned
-- **Use telemetry**: Capture performance and error metrics early
-- **Test across modes**: Run tests in both sync and async contexts
-- **Leverage CLI**: Automate repetitive tasks (shell, migrations, model generation)
-
-## 14. FAQ
-**Q: How to handle large datasets?**
-A: Use cursor batching:
-```python
-cursor = db.User.find().batch_size(100)
-for batch in await cursor.to_list():
-    process(batch)
-```
-**Q: Can I integrate with FastAPI?**
-A: Yes. Initialize `db` in your startup event and import schemas into routers.
-**Q: Are transactions supported?**
-A: Use:
-```python
-async with db.transaction():
-    await db.Order.insert({...})
-    await db.Inventory.update({...})
-```
-gdmongolite empowers everyone—from beginners to experts—to build MongoDB-backed applications with minimal boilerplate, robust validation, and comprehensive tooling. Start coding and let gdmongolite handle the rest
+MIT License - see [LICENSE](LICENSE) file.
 
 ## Author
+
 **Ganesh Datta Padamata**
-Email: ganeshdattapadamata@gmail.com
-PyPI: ganeshdatta999
+- Email: ganeshdattapadamata@gmail.com
+- GitHub: [@ganeshdatta23](https://github.com/ganeshdatta23)
+
+
+---
+
+**🚀 Transform your MongoDB development experience with gdmongolite!**
