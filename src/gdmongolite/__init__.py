@@ -1,6 +1,6 @@
 """gdmongolite: The World's Most Powerful and Easiest MongoDB Toolkit"""
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __author__ = "Ganesh Datta Padamata"
 __email__ = "ganeshdattapadamata@gmail.com"
 
