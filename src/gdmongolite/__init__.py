@@ -1,6 +1,6 @@
 """gdmongolite: The World's Most Powerful and Easiest MongoDB Toolkit"""
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "Ganesh Datta Padamata"
 __email__ = "ganeshdattapadamata@gmail.com"
 
@@ -221,3 +221,6 @@ __all__.extend(["quick_setup", "production_setup", "development_setup"])
 if not os.getenv('GDMONGO_SUPPRESS_STARTUP', False):
     print(f"gdmongolite v{__version__} - The World's Most Powerful MongoDB Toolkit loaded!")
     print("Ready for development and production use!")
+    print(f"GitHub: https://github.com/ganeshdatta23/gdmongolite")
+    print(f"PyPI: https://pypi.org/project/gdmongolite/")
+    print(f"Author: Ganesh Datta Padamata (ganeshdattapadamata@gmail.com)")

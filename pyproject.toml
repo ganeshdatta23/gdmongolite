@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "gdmongolite"
-version = "1.0.0"
+version = "1.0.1"
 description = "🚀 The World's Most Powerful and Easiest MongoDB Toolkit - Zero-boilerplate, schema-first MongoDB operations with automatic sync/async detection, advanced queries, real-time features, comprehensive security, caching, monitoring, FastAPI integration, and production-ready deployment tools."
 authors = ["Ganesh Datta Padamata <ganeshdattapadamata@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/ganeshdatta999/gdmongolite"
-repository = "https://github.com/ganeshdatta999/gdmongolite"
+homepage = "https://github.com/ganeshdatta23/gdmongolite"
+repository = "https://github.com/ganeshdatta23/gdmongolite"
 documentation = "https://gdmongolite.readthedocs.io"
 keywords = [
     "mongodb", "database", "orm", "async", "pydantic", "fastapi", "websockets",
@@ -38,10 +38,10 @@ classifiers = [
 packages = [{include = "gdmongolite", from = "src"}]
 
 [tool.poetry.urls]
-"Bug Tracker" = "https://github.com/ganeshdatta999/gdmongolite/issues"
-"Changelog" = "https://github.com/ganeshdatta999/gdmongolite/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/ganeshdatta23/gdmongolite/issues"
+"Changelog" = "https://github.com/ganeshdatta23/gdmongolite/blob/main/CHANGELOG.md"
 "Documentation" = "https://gdmongolite.readthedocs.io"
-"Funding" = "https://github.com/sponsors/ganeshdatta999"
+"Funding" = "https://github.com/sponsors/ganeshdatta23"
 
 [tool.poetry.dependencies]
 python = ">=3.8, <4.0"

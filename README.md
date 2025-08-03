@@ -590,10 +590,10 @@ async def analytics():
 
 ## Support and Documentation
 
-- **GitHub**: https://github.com/ganeshdatta999/gdmongolite
+- **GitHub**: https://github.com/ganeshdatta23/gdmongolite
 - **Documentation**: https://gdmongolite.readthedocs.io
 - **PyPI**: https://pypi.org/project/gdmongolite/
-- **Issues**: https://github.com/ganeshdatta999/gdmongolite/issues
+- **Issues**: https://github.com/ganeshdatta23/gdmongolite/issues
 
 ## License
 
